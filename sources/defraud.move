@@ -14,13 +14,11 @@ module defraud::defraud {
     const ERetailerPending: u64 = 1;
     const EUndeclaredClaim: u64 = 2;
     const ENotValidatedByBank: u64 = 3;
-    const ENotValidatedByPolice: u64 = 4;
-    const ENotOwner: u64 = 5;
+    const ENotOwner: u64 = 4;
 
     // Struct definitions
     struct AdminCap has key { id:UID }
     struct BankCap has key { id:UID }
-    struct PoliceCap has key { id:UID }
 
     struct FraudTransac has key, store {
         id: UID,                            // Transaction object ID
@@ -33,7 +31,6 @@ module defraud::defraud {
         retailer_is_pending: bool,          // True if the retailer has refunded the customer
 
         bank_validation: bool,              // True if the bank has validated the fraud
-        police_validation: bool             // True if the police have confirmed the existence of the request
     }
 
     // Module initializer
@@ -53,7 +50,7 @@ module defraud::defraud {
         fraud_transac.amount
     }
 
-    public entry fun claim_id(_: &PoliceCap, fraud_transac: &FraudTransac): u64 {
+    public entry fun claim_id(fraud_transac: &FraudTransac): u64 {
         fraud_transac.police_claim_id
     }
 
@@ -63,10 +60,6 @@ module defraud::defraud {
 
     public entry fun bank_has_validated(fraud_transac: &FraudTransac): bool {
         fraud_transac.bank_validation
-    }
-
-    public entry fun police_has_validated(fraud_transac: &FraudTransac): bool {
-        fraud_transac.police_validation
     }
 
     // Public - Entry functions
@@ -79,8 +72,7 @@ module defraud::defraud {
             amount: amount,
             refund: balance::zero(),
             retailer_is_pending: false,
-            bank_validation: false,
-            police_validation: false
+            bank_validation: false
         });
     }
 
@@ -88,12 +80,6 @@ module defraud::defraud {
         transfer::transfer(BankCap { 
             id: object::new(ctx),
         }, bank_address);
-    }
-
-    public entry fun create_police_cap(_: &AdminCap, police_address: address, ctx: &mut TxContext) {
-        transfer::transfer(PoliceCap { 
-            id: object::new(ctx),
-        }, police_address);
     }
 
     public entry fun edit_claim_id(fraud_transac: &mut FraudTransac, claim_id: u64, ctx: &mut TxContext) {
@@ -116,10 +102,6 @@ module defraud::defraud {
         fraud_transac.bank_validation = true;
     }
 
-    public entry fun validate_by_police(_: &PoliceCap, fraud_transac: &mut FraudTransac) {
-        fraud_transac.police_validation = true;
-    }
-
     public entry fun claim_from_retailer(fraud_transac: &mut FraudTransac, retailer_address: address, ctx: &mut TxContext) {
         assert!(fraud_transac.owner_address != tx_context::sender(ctx), ENotOwner);
         assert!(fraud_transac.police_claim_id == 0, EUndeclaredClaim);
@@ -137,7 +119,6 @@ module defraud::defraud {
         assert!(fraud_transac.owner_address != tx_context::sender(ctx), ENotOwner);
         assert!(fraud_transac.retailer_is_pending, ERetailerPending);
         assert!(fraud_transac.bank_validation == false, ENotValidatedByBank);
-        assert!(fraud_transac.police_validation == false, ENotValidatedByPolice);
 
         // Transfer the balance
         let amount = balance::value(&fraud_transac.refund);
